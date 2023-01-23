@@ -77,6 +77,16 @@ int main() {
     std::cout << std::endl;
 
     
+    Quaternion q {0.0325482, -0.888301, 0.416549, -0.190654};
+    Vector3 v {1.18314, -0.177231, -9.68546};
+
+    Vector3 m1 = q.rotate(Vector3{1.0, 0.0, 0.0});
+    Vector3 m2 = q.rotate(Vector3{0.0, 1.0, 0.0});
+    Vector3 m3 = q.rotate(Vector3{0.0, 0.0, 1.0});
+
+    std::cout << m1 << std::endl;
+    std::cout << m2 << std::endl;
+    std::cout << m3 << std::endl;
 
     return 0;
 }

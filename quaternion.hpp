@@ -7,17 +7,17 @@
 
 class Quaternion {
 private:
-    float values[4] = { 0.0f };
+    double values[4] = { 0.0f };
 
 public:
     Quaternion()
             : values{1.0f, 0.0f, 0.0f, 0.0f} {}
 
-    Quaternion(float i, float j, float k)
+    Quaternion(double i, double j, double k)
             : values{0.0f, i, j, k} {
     }
 
-    Quaternion(float x, const Quaternion & v)
+    Quaternion(double x, const Quaternion & v)
             : values{x, v.values[1], v.values[2], v.values[3]} {
     }
 
@@ -25,11 +25,11 @@ public:
             : values{0.0f, vec[0], vec[1], vec[2]} {
     }
 
-    Quaternion(float x, const Vector3 & vec)
+    Quaternion(double x, const Vector3 & vec)
             : values{x, vec[0], vec[1], vec[2]} {
     }
 
-    Quaternion(float x, float i, float j, float k)
+    Quaternion(double x, double i, double j, double k)
             : values{x, i, j, k} {
     }
 
@@ -42,11 +42,11 @@ public:
         );
     }
 
-    float dot(const Quaternion & x) const {
+    double dot(const Quaternion & x) const {
         return values[0] * x.values[0] + values[1] * x.values[1] + values[2] * x.values[2] + values[3] * x.values[3];
     }
 
-    Quaternion operator*(float f) const {
+    Quaternion operator*(double f) const {
         return Quaternion (
             f * values[0], f * values[1], f * values[2], f * values[3]
         );
@@ -64,7 +64,7 @@ public:
         );
     }
 
-    float length() const {
+    double length() const {
         return sqrt(dot(*this));
     }
 
@@ -78,8 +78,8 @@ public:
 
     Quaternion log() const {
         Quaternion v (0.0f, *this);
-        float v_len = v.length();
-        float q_len = length();
+        double v_len = v.length();
+        double q_len = length();
         if (v_len == 0.0f)
             return Quaternion(
                 ::log(q_len), 0.0f, 0.0f, 0.0f
@@ -92,7 +92,7 @@ public:
 
     Quaternion exp() const {
         Quaternion v (0.0f, *this);
-        float v_len = v.length();
+        double v_len = v.length();
         if (v_len == 0.0f) {
             return Quaternion(::exp(values[0]), 0.0f, 0.0f, 0.0f);
         }
@@ -102,24 +102,24 @@ public:
         ) * (::exp(values[0]));
     }
 
-    Quaternion exp(float t) const {
+    Quaternion exp(double t) const {
         return (log() * t).exp();
     }
 
     // Same as exp(t)
-    Quaternion slerp(float t) const {
+    Quaternion slerp(double t) const {
         return Quaternion().slerp(*this, t);
     }
 
-    Quaternion slerp(const Quaternion & p2, float t) const {
-        float ratio = dot(p2) / (length() * p2.length());
-        float theta = ::acos(ratio);
+    Quaternion slerp(const Quaternion & p2, double t) const {
+        double ratio = dot(p2) / (length() * p2.length());
+        double theta = ::acos(ratio);
         if (ratio >= 0.9999)
             return *this;
         return *this * (::sin((1.0f - t) * theta) / ::sin(theta)) + p2 * (::sin(t * theta) / ::sin(theta));
     }
 
-    float operator[](unsigned n) const {
+    double operator[](unsigned n) const {
         return values[n];
     }
 
@@ -127,16 +127,21 @@ public:
         return out << "[" << q.values[0] << ", " << q.values[1] << ", " << q.values[2] << ", " << q.values[3] << "]";
     }
 
-    static Quaternion rotate(float angle, float i, float j, float k) {
+    static Quaternion rotate(double angle, double i, double j, double k) {
+        //angle *= 2;
         return Quaternion(
-            ::cos(angle),
-            Quaternion(i,j,k) * ::sin(angle)
+            ::cos(angle / 2),
+            Quaternion(i,j,k) * ::sin(angle / 2)
         );
     }
 
     Vector3 rotate(const Vector3 & point) const {
         Quaternion res = *this * Quaternion(point) * this->inverse();
         return Vector3(res[1], res[2], res[3]);
+    }
+
+    operator Matrix3() const {
+        return Matrix3();
     }
 
 };
