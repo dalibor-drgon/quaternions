@@ -112,9 +112,15 @@ static float find_offsets(float *dm,
 }
 #endif
 
+#if 0
 #define F(x) (x * (9.81 / 2048.0))
 #define FI(y) (y * (2048.0 / 9.81))
-#define FI2(y) (2048.0 * 2048.0 / (9.81 * 9.81))
+#define FI2(y) y * (2048.0 * 2048.0 / (9.81 * 9.81))
+#else
+#define F(x) x
+#define FI(y) y
+#define FI2(y) y
+#endif
 
 extern "C" int32_t acc_find_offsets(int16_t dm[3], const acc_calibration_entry * entries, unsigned n) {
     acc_entry *entries_float = (acc_entry*) malloc(sizeof(*entries_float) * n);

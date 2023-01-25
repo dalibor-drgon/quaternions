@@ -3,13 +3,13 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <iomanip>
 
 #include "tracking.hpp"
 
-#include <eigen3/Eigen/Geometry>
-#include <eigen3/Eigen/Dense>
 
 using namespace std;
+using namespace Eigen;
 
 Tracking track;
 
@@ -49,21 +49,20 @@ void parse6(ifstream & in) {
     }
 }
 
-Vector3 from_acc(double x, double y, double z) {
-    Vector3 vec = Vector3(x, y, z) * (9.81 / 2048);
+Vector3f from_acc(double x, double y, double z) {
+    Vector3f vec = Vector3f{(float) x, (float) y, (float) z} * (9.81 / 2048);
     //cerr << "Acc:  " << vec << endl;
-    vec = vec - Vector3(-0.159, 0.030, 0.139);
+    vec = vec - Vector3f{-0.159, 0.030, 0.139};
     return vec;
 }
 
 #define DX 10
 
-Quaternion from_gyro(const Vector3 & vec, float dt) {
-    Quaternion rot = 
-        Quaternion::rotate(vec[0] * dt, 1, 0, 0) *
-        Quaternion::rotate(vec[1] * dt, 0, 1, 0) *
-        Quaternion::rotate(vec[2] * dt, 0, 0, 1);
-    //cerr << "GRot: " << rot << endl;
+Quaternionf from_gyro(const Vector3f & vec, float dt) {
+    Quaternionf rot (
+        AngleAxisf(vec[0] * dt, Vector3f::UnitX()) *
+        AngleAxisf(vec[1] * dt, Vector3f::UnitY()) *
+        AngleAxisf(vec[2] * dt, Vector3f::UnitZ()));
     return rot;
 
 }
@@ -78,12 +77,12 @@ double check(double gyr) {
         return min(gyr + 2, 0);
 }
 
-Quaternion from_gyro(double x, double y, double z, float dt) {
+Quaternionf from_gyro(double x, double y, double z, float dt) {
     x = check(x+5);
     y = check(y-7);
     z = check(z-3);
 
-    Vector3 vec(x, y, z);
+    Vector3f vec{(float) x, (float) y, (float) z};
     vec = vec * (M_PI / 180 / (32.768 / 2));
     //cerr << "Gyro: " << vec << endl;
     return from_gyro(vec, dt);
@@ -97,11 +96,11 @@ void on_measurement(array<double, 6> arr) {
     }
 
     float dt = 4e-3;
-    Vector3 acc = from_acc(arr[0], arr[1], arr[2]);
-    Quaternion gyr = from_gyro(arr[3], arr[4], arr[5], dt);
+    Vector3f acc = from_acc(arr[0], arr[1], arr[2]);
+    Quaternionf gyr = from_gyro(arr[3], arr[4], arr[5], dt);
     track.on_entry(gyr, acc, dt);
     //cout << "GyrQ: " << gyr << endl;
-    cout << track.rot << "\t" << acc << "\t" << track.p_acc << endl;
+    //cout << track.rot << "\t" << acc.format(EigenCommaFormat) << "\t" << track.p_acc.format(EigenCommaFormat) << endl;
 #if 0
     cout << "Rota: " << track.rot << endl;
     cout << "Acce: " << track.p_acc << endl;
@@ -110,11 +109,15 @@ void on_measurement(array<double, 6> arr) {
 #endif
 }
 
+
 int main(int argc, char **argp) {
     if (argc != 2) {
         return 1;
     }
+    cout << fixed << setprecision(4);
     ifstream in(argp[1]);
+
+
 #if 0
     vector<array<double, 6>> vec;
     parse6(vec, in);
