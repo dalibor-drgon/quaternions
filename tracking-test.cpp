@@ -6,6 +6,7 @@
 #include <iomanip>
 
 #include "tracking.hpp"
+#include "history.hpp"
 
 
 using namespace std;
@@ -50,9 +51,10 @@ void parse6(ifstream & in) {
 }
 
 Vector3f from_acc(double x, double y, double z) {
-    Vector3f vec = Vector3f{(float) x, (float) y, (float) z} * (9.81 / 2048);
+    Vector3f vec = Vector3f{(float) x, (float) y, (float) z} * (9.81 / 2048 / 4);
     //cerr << "Acc:  " << vec << endl;
-    vec = vec - Vector3f{-0.159, 0.030, 0.139};
+    //vec = vec - Vector3f{-0.159, 0.030, 0.139};
+    vec = vec - Vector3f{0.05488, -0.28921, 0.23923};
     return vec;
 }
 
@@ -72,21 +74,22 @@ Quaternionf from_gyro(const Vector3f & vec, float dt) {
 
 double check(double gyr) {
     if (gyr > 0)
-        return max(gyr - 2, 0);
+        return max(gyr - 1, 0);
     else 
-        return min(gyr + 2, 0);
+        return min(gyr + 1, 0);
 }
 
-Quaternionf from_gyro(double x, double y, double z, float dt) {
-    x = check(x+5);
-    y = check(y-7);
+Vector3f from_gyro(double x, double y, double z) {
+    x = check(x+10);
+    y = check(y-12);
     z = check(z-3);
 
     Vector3f vec{(float) x, (float) y, (float) z};
-    vec = vec * (M_PI / 180 / (32.768 / 2));
-    //cerr << "Gyro: " << vec << endl;
-    return from_gyro(vec, dt);
+    return vec * (M_PI / 180 / (32.768));
 }
+
+static History<Vector3f, 1> hist_acc;
+static History<Vector3f, 1> hist_gyr;
 
 void on_measurement(array<double, 6> arr) {
     static int cnt = 0;
@@ -97,8 +100,13 @@ void on_measurement(array<double, 6> arr) {
 
     float dt = 4e-3;
     Vector3f acc = from_acc(arr[0], arr[1], arr[2]);
-    Quaternionf gyr = from_gyro(arr[3], arr[4], arr[5], dt);
-    track.on_entry(gyr, acc, dt);
+    Vector3f gyr = from_gyro(arr[3], arr[4], arr[5]);
+
+    hist_acc.add(acc); acc = hist_acc.average(Vector3f::Zero());
+    hist_gyr.add(gyr); gyr = hist_gyr.average(Vector3f::Zero());
+
+    Quaternionf gyr_quat = from_gyro(gyr, dt);
+    track.on_entry(gyr_quat, acc, dt);
     //cout << "GyrQ: " << gyr << endl;
     //cout << track.rot << "\t" << acc.format(EigenCommaFormat) << "\t" << track.p_acc.format(EigenCommaFormat) << endl;
 #if 0
@@ -114,7 +122,8 @@ int main(int argc, char **argp) {
     if (argc != 2) {
         return 1;
     }
-    cout << fixed << setprecision(4);
+    cout << fixed << setprecision(6);
+    cerr << fixed << setprecision(4);
     ifstream in(argp[1]);
 
 

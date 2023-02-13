@@ -90,7 +90,7 @@ static float find_offsets(float *dm,
 #include <eigen3/Eigen/Dense>
 using namespace Eigen;
 
-static float find_offsets(float *dm, 
+static float find_guess(float *dm, 
         const acc_entry * entries, unsigned n) {
 
     // Create matrices A and b for the equation: A * dm = b
@@ -110,9 +110,43 @@ static float find_offsets(float *dm,
     }
     return cost_function(dm, NULL, entries, n);
 }
+
+#include "optimizer.hpp"
+
+//float minimize_muller_step(float p0, float p1, float p2, float y0, float y1, float y2);
+
+static float find_offsets(float *dm, 
+        const acc_entry * entries, unsigned n) {
+    //find_guess(dm, entries, n);
+    float cost = 0;
+    for(unsigned i = 0; i < 4; i++) {
+        float der[3] = {0};
+        cost = cost_function(dm, der, entries, n);
+        printf("%f, %f, %f\n", der[0], der[1], der[2]);
+        float p0 = 0.0;
+        float p1 = -0.3;
+        float p2 = -1.0;
+        float y0 = cost_function(dm, NULL, entries, n);
+        for(unsigned j = 0; j < 3; j++) {
+            dm[j] += (p1 - p0) * der[j];
+        }
+        float y1 = cost_function(dm, NULL, entries, n);
+        for(unsigned j = 0; j < 3; j++) {
+            dm[j] += (p2 - p1) * der[j];
+        }
+        float y2 = cost_function(dm, NULL, entries, n);
+        float p3 = minimize_muller_step(p0, p1, p2, y0, y1, y2);
+        for(unsigned j = 0; j < 3; j++) {
+            dm[j] += (p3 - p2) * der[j];
+        }
+        printf("f(p3=%f)=%f\n", p3, cost_function(dm, NULL, entries, n));
+    }
+    cost = cost_function(dm, NULL, entries, n);
+    return cost;
+}
 #endif
 
-#if 0
+#if 1
 #define F(x) (x * (9.81 / 2048.0))
 #define FI(y) (y * (2048.0 / 9.81))
 #define FI2(y) y * (2048.0 * 2048.0 / (9.81 * 9.81))
@@ -146,12 +180,31 @@ int main(int argc, const char **argp) {
         {0.2, 0.1, 9.81+0.3}
     };
 #endif
+#if 0
     acc_calibration_entry entries[4] = {
         {(-978),(-1807),(142)},
         {(84),(-1518),(-1334)},
         {(-1521),(188),(-1367)},
         {(208),(-206),(2052)}
     };
+
+    int16_t off[3] = {0};
+    float cost = acc_find_offsets(off, entries, sizeof(entries)/sizeof(*entries));
+    printf("Found offsets [%d] %d %d %d\n", (int) cost, (int) off[0], (int) off[1], (int) off[2]);
+#else
+    acc_entry entries[6] = {
+        {-1.059890,0.399846,10.054238},
+        {0.075886,9.409678,0.340540},
+        {0.053654,-10.080501,-0.165683},
+        {-9.706564,-0.417788,-0.308230},
+        {9.862615,-0.214275,0.494906},
+        {0.052734,-0.165477,-9.570475}
+    };
+
+    float off[3] = {0};
+    float cost = find_offsets(off, entries, sizeof(entries)/sizeof(*entries));
+    printf("Found offsets [%f] %f %f %f\n", cost, off[0], off[1], off[2]);
+#endif
 #if 0
     printf("data=[");
     for(unsigned i = 0; i < 4; i++) {
@@ -159,9 +212,5 @@ int main(int argc, const char **argp) {
     }
     printf("]\n");
 #endif
-    int16_t off[3] = {0};
-    float cost = acc_find_offsets(off, entries, sizeof(entries)/sizeof(*entries));
-    printf("Found offsets [%d] %d %d %d\n", (int) cost, (int) off[0], (int) off[1], (int) off[2]);
-    // -5,7,3
 }
 

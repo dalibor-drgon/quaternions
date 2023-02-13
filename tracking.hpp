@@ -6,6 +6,7 @@
 #include <eigen3/Eigen/Dense>
 
 static Eigen::IOFormat EigenCommaFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", "; ", "", "", "[", "]");
+static Eigen::IOFormat EigenCsvFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ",", ",", "", "", "", "");
 
 static inline std::ostream & operator<<(std::ostream &out, const Eigen::Quaternionf & q) {
     //return out << "[" << q.w() << ", " << q.x() << ", " << q.y() << ", " << q.z() << "]";
@@ -20,6 +21,11 @@ public:
     Eigen::Vector3f p_vec;
     Eigen::Vector3f p;
     Eigen::Vector3f g {0, 0, -9.81};
+    Eigen::Vector3f acc_prev {0,0,0};
+    Eigen::Vector3f vec_prev;
+    int nmb = 0;
+
+    Eigen::Vector3f p1, p2;
 
     Eigen::Vector3f inc_acc_nfa;
     Eigen::Vector3f inc_acc_fa;
@@ -51,11 +57,14 @@ public:
         Eigen::Matrix3f new_rot;
         new_rot << base[2], base[0], base[1], base[1], base[2], base[0], base[0], base[1], base[2];
 #elif 1
+        /*
         Eigen::Vector3f xyz = v.cross(g);
         float w = 9.81 * 9.81 + v.dot(g);
         Eigen::Quaternionf q {w, xyz[0], xyz[1], xyz[2]};
         q.normalize();
         Eigen::Matrix3f new_rot (q);
+        */
+        rot = calculate_rotation(v, g);
 #else
         Eigen::Vector3f dif = g - v;
         Eigen::Matrix3f rot_dif = dif * pinv(v).transpose(); // / (9.81 * 9.81);
@@ -71,7 +80,7 @@ public:
         rot = Eigen::Quaternionf(new_rot);
         std::cout << rot.coeffs().format(EigenCommaFormat) << std::endl;
         */
-        rot = Eigen::Quaternionf(new_rot);
+        //rot = Eigen::Quaternionf(new_rot);
     }
 
 
@@ -79,6 +88,8 @@ public:
         float len2 = vec.dot(vec);
         return vec * (1.0f / len2);
     }
+
+    static Eigen::Quaternionf calculate_rotation(Eigen::Vector3f from, Eigen::Vector3f to);
 
     static Eigen::Vector3f normalize(const Eigen::Vector3f & acc);
     Eigen::Matrix3f compute_correction(Eigen::Matrix3f rot, Eigen::Vector3f inc_acc);
