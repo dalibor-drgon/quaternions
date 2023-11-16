@@ -7,11 +7,16 @@
 
 #include "tracking.hpp"
 #include "history.hpp"
+#include <Fusion.h>
 
 
 using namespace std;
 using namespace Eigen;
 
+
+// Initialise algorithms
+FusionOffset offset;
+FusionAhrs ahrs;
 Tracking track;
 
 void on_measurement(array<double, 6> arr);
@@ -54,8 +59,9 @@ Vector3f from_acc(double x, double y, double z) {
     Vector3f vec = Vector3f{(float) x, (float) y, (float) z} * (9.81 / 2048 / 4);
     //cerr << "Acc:  " << vec << endl;
     //vec = vec - Vector3f{-0.159, 0.030, 0.139};
-    vec = vec - Vector3f{0.05488, -0.28921, 0.23923};
-    return vec;
+    vec -= Vector3f{0.190, -0.378, 0.304};
+    //vec = vec - Vector3f{-0.249111, 0.177253, -0.341889};
+    return vec * (1.0f / 9.81);
 }
 
 #define DX 10
@@ -80,41 +86,54 @@ double check(double gyr) {
 }
 
 Vector3f from_gyro(double x, double y, double z) {
+    //x = check(x+14);
+    //y = check(y-50);
+    //z = check(z+2);
     x = check(x+10);
-    y = check(y-12);
-    z = check(z-3);
+    y = check(y-13);
+    z = check(z-7);
 
     Vector3f vec{(float) x, (float) y, (float) z};
-    return vec * (M_PI / 180 / (32.768));
+    return vec * (1.0f / 32.768);
+    //return vec * (1.0f / 16);
+
 }
 
-static History<Vector3f, 1> hist_acc;
-static History<Vector3f, 1> hist_gyr;
+FusionVector to_fusion(const Eigen::Vector3f & vec) {
+    return (FusionVector) {vec[0], vec[1], vec[2]};
+}
+
+Vector3f to_eigen(const FusionVector & vec) {
+    return Vector3f { vec.array[0], vec.array[1], vec.array[2] };
+}
+
+Vector3f to_eigen(const FusionEuler & vec) {
+    return Vector3f { vec.array[0], vec.array[1], vec.array[2] };
+}
 
 void on_measurement(array<double, 6> arr) {
-    static int cnt = 0;
-    if (++cnt == 1) {
-        Tracking track_(from_acc(arr[0], arr[1], arr[2]));
-        track = track_;
-    }
-
     float dt = 4e-3;
     Vector3f acc = from_acc(arr[0], arr[1], arr[2]);
     Vector3f gyr = from_gyro(arr[3], arr[4], arr[5]);
 
-    hist_acc.add(acc); acc = hist_acc.average(Vector3f::Zero());
-    hist_gyr.add(gyr); gyr = hist_gyr.average(Vector3f::Zero());
+    // Update gyroscope offset correction algorithm
+    FusionVector gyroscope = FusionOffsetUpdate(&offset, to_fusion(gyr));
+    FusionVector accelerometer = to_fusion(acc);
 
-    Quaternionf gyr_quat = from_gyro(gyr, dt);
-    track.on_entry(gyr_quat, acc, dt);
-    //cout << "GyrQ: " << gyr << endl;
-    //cout << track.rot << "\t" << acc.format(EigenCommaFormat) << "\t" << track.p_acc.format(EigenCommaFormat) << endl;
-#if 0
-    cout << "Rota: " << track.rot << endl;
-    cout << "Acce: " << track.p_acc << endl;
-    cout << "Vect: " << track.p_vec << endl;
-    cout << "Loca: " << track.p << endl;
-#endif
+
+    static int cnt = 0;
+    FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, dt);
+    //Vector3f linacc = to_eigen(FusionAhrsGetLinearAcceleration(&ahrs)) * 9.81;
+    Vector3f linacc = to_eigen(FusionAhrsGetEarthAcceleration(&ahrs)) * 9.81;
+
+    Vector3f axes = to_eigen(FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs)));
+    //cerr << axes.format(EigenCommaFormat) << "\t";
+    cerr << to_eigen(gyroscope).format(EigenCommaFormat) << "\t";
+
+    if (cnt == 200) {
+        track.on_entry_acc(linacc, dt);
+    } else cnt++;
+
 }
 
 
@@ -124,29 +143,22 @@ int main(int argc, char **argp) {
     }
     cout << fixed << setprecision(6);
     cerr << fixed << setprecision(4);
+
+    FusionOffsetInitialise(&offset, 200);
+    FusionAhrsInitialise(&ahrs);
+
+    // Set AHRS algorithm settings
+    const FusionAhrsSettings settings = {
+            .gain = 0.5f,
+            .accelerationRejection = 10.0f,
+            .magneticRejection = 20.0f,
+            .rejectionTimeout = 200, 
+    };
+    FusionAhrsSetSettings(&ahrs, &settings);
+
+
     ifstream in(argp[1]);
-
-
-#if 0
-    vector<array<double, 6>> vec;
-    parse6(vec, in);
-
-    if (0) {
-        float dt = 1.0;
-        cout << Quaternion::rotate(M_PI, 1, 0, 0) << endl;
-        cout << from_gyro(Vector3(1, 0, 0), dt) << endl;
-        cout << from_gyro(Vector3(0, 1, 0), dt) << endl;
-        cout << from_gyro(Vector3(0, 0, 1), dt) << endl;
-        cout << from_gyro(Vector3(1, 0, 1), dt) << endl;
-        return 0;
-    }
-    for (auto & arr : vec) {
-        on_measurement(arr);
-    }
-#else
     parse6(in);
-#endif
-
     return 0;
 }
 
